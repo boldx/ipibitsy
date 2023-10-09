@@ -1,0 +1,5 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "ipibitsy")(type "KiCad")(uri "${KIPRJMOD}/ipibitsy.pretty")(options "")(descr ""))
+  (lib (name "Footprints")(type "KiCad")(uri "${KIPRJMOD}/Kicad-STM32/Footprints")(options "")(descr ""))
+)

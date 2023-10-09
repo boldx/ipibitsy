@@ -1,0 +1,6 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "YAAJ_WeAct_BlackPill_Part_Like")(type "Legacy")(uri "${KIPRJMOD}/Kicad-STM32/Symbols/YAAJ_WeAct_BlackPill_Part_Like.lib")(options "")(descr ""))
+  (lib (name "YAAJ_WeAct_BlackPill_Part_Like_SWD_Breakout")(type "Legacy")(uri "${KIPRJMOD}/Kicad-STM32/Symbols/YAAJ_WeAct_BlackPill_Part_Like_SWD_Breakout.lib")(options "")(descr ""))
+  (lib (name "ipibitsy")(type "KiCad")(uri "${KIPRJMOD}/ipibitsy.kicad_sym")(options "")(descr ""))
+)
