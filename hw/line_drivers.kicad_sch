@@ -1442,7 +1442,7 @@
     (effects (font (size 1.27 1.27)) (justify right bottom))
     (uuid a18f003c-e960-4417-a6ef-fc088bffed01)
   )
-  (label "BUS_A.DIR" (at 194.31 213.36 180) (fields_autoplaced)
+  (label "BUS_B.DIR" (at 194.31 213.36 180) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify right bottom))
     (uuid a2fc7eb7-ad60-46ba-b846-f86e6a5776f3)
   )
