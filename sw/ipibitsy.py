@@ -1,4 +1,3 @@
-import math
 import struct
 import time
 from enum import Enum
@@ -215,6 +214,8 @@ class IpiL1:
     def __init__(self, phy):
         self.phy = phy
         self.phy_state = phy.get_state()
+        self.apply_state(PhyCtrlState.IDLE, IpiDataBus(False, 0), IpiDataBus(False, 0))
+        self.wait_for_state(PhyCtrlState.IDLE, 0.5)
 
     def wait_for_state(self, state, timeout):
         self.wait_for_any_of_states((state,), timeout)
@@ -305,19 +306,16 @@ class IpiL1:
     def select(self, slave_addr, change_xfrm=False, change_octetm=False, prio_hold=False, prio_select=False):
         self.wait_for_state(PhyCtrlState.IDLE, 0.5)
         req = (slave_addr << 4) | (change_xfrm << 3) | (change_octetm << 2) | (prio_hold << 1) | (prio_select << 0)
-        phy_state = IpiPhyState(IpiDataBus(True, req, parity=0))
-        self.phy.set_state(phy_state)
-        phy_state.sel_out = True
-        self.phy.set_state(phy_state)
+        self.apply_state(PhyCtrlState.SELECT, IpiDataBus(True, req, parity=0), IpiDataBus(False, 0))
         self.wait_for_state(PhyCtrlState.SLAVACK, 0.5)
         # TODO: "To detect multiple selection. the master must wait until all slaves have had enough time to respond."
         resp = self.phy_state.busb.value
-        if int(math.log2(resp)) == slave_addr:
+        if resp == (1 << slave_addr):
             return SelectStatus.OK
         elif resp == 0:
             return SelectStatus.BUSY
         else:
-            self.phy.set_state(IpiPhyState())
+            self.apply_state(PhyCtrlState.IDLE, IpiDataBus(False, 0), IpiDataBus(False, 0))
             raise ValueError(f"Unexpected BUS B select status: {resp} ({bin(resp)})")
 
     def select_facility(self, slave_addr, facility_addr):
@@ -340,10 +338,7 @@ class IpiL1:
             raise ValueError(f"Unexpected BUS B select status: {resp} ({bin(resp)})")
 
     def master_reset(self):
-        state = IpiPhyState()
-        self.phy.set_state(state)
-        state.sync_out = True
-        self.phy.set_state(state)
+        self.apply_state(PhyCtrlState.MAINT1, IpiDataBus(False, 0), IpiDataBus(False, 0))
 
     def selective_reset(self, slave_addr, reset_control):
         req = (slave_addr << 4) | reset_control
@@ -368,11 +363,7 @@ class IpiL1:
             req |= (1 << 7)
         if dir == BusCtlDir.INFO_IN:
             req |= (1 << 6)
-        self.phy_state.busa = IpiDataBus(True, req)
-        self.phy_state.busb = IpiDataBus(False, 0)
-        self.phy.set_state(self.phy_state)
-        self.phy_state.sync_out = True
-        self.phy.set_state(self.phy_state)
+        self.apply_state(PhyCtrlState.BUSACK, IpiDataBus(True, req), IpiDataBus(False, 0))
         self.wait_for_state(PhyCtrlState.BUSACK, 0.5)
         resp = self.phy_state.busb.value
         busack = {
@@ -381,8 +372,7 @@ class IpiL1:
             'dir': BusCtlDir.INFO_IN if resp & 0x40 else BusCtlDir.INFO_OUT,
             'params': resp & 0x3F
         }
-        self.phy_state.sync_out = False
-        self.phy.set_state(self.phy_state)
+        self.apply_state(PhyCtrlState.MASTEND)
         self.wait_for_state(PhyCtrlState.SLAVACK, 0.5)
         resp = self.phy_state.busb.value
         slavack = {
@@ -395,30 +385,14 @@ class IpiL1:
 
     def transfer_out(self, data_out, octet_mode=OctetMode.SOM):
         self.wait_for_any_of_states((PhyCtrlState.SLAVACK, PhyCtrlState.XFREND), 0.5)
-        self.phy_state.busa.dir = True
-        self.phy_state.busa.value = data_out[0]
-        self.phy_state.busb.dir = False
-        if octet_mode == OctetMode.DOM:
-            self.phy_state.busb.dir = True
-            self.phy_state.busb.value = data_out[1]
-        self.phy_state.sync_out = False
-        self.phy.set_state(self.phy_state)
-        self.phy_state.mst_out = True
-        self.phy.set_state(self.phy_state)
+        busb = IpiDataBus(True, data_out[1]) if octet_mode == OctetMode.DOM else IpiDataBus(False, 0)
+        self.apply_state(PhyCtrlState.XFRRDY, IpiDataBus(True, data_out[0]), busb)
         self.wait_for_state(PhyCtrlState.XFRST, 0.25)
-        self.phy_state.sync_out = True
-        self.phy.set_state(self.phy_state)
+        self.apply_state(PhyCtrlState.XFRRES)
         self.wait_for_state(PhyCtrlState.XFREND, 0.25)
 
     def transfer_in(self, octet_mode=OctetMode.SOM):
         self.wait_for_any_of_states((PhyCtrlState.SLAVACK, PhyCtrlState.XFREND), 0.5)
-        # self.phy_state.sync_out = False
-        # self.phy_state.busa.dir = False
-        # self.phy_state.busb.dir = False
-        # self.phy.set_state(self.phy_state)
-
-        # self.phy_state.mst_out = True
-        # self.phy.set_state(self.phy_state)
         self.apply_state(PhyCtrlState.XFRRDY, IpiDataBus(False, 0), IpiDataBus(False, 0))
         self.wait_for_any_of_states((PhyCtrlState.XFRST, PhyCtrlState.SLAVEND), 0.25)
         if self.phy_state.ctrl_state == PhyCtrlState.SLAVEND:
@@ -427,14 +401,13 @@ class IpiL1:
             data_in = bytes((self.phy_state.busb.value,))
         else:
             data_in = bytes((self.phy_state.busa.value, self.phy_state.busb.value))
-        # self.phy_state.sync_out = True
-        # self.phy.set_state(self.phy_state)
         self.apply_state(PhyCtrlState.XFRRES)
         self.wait_for_state(PhyCtrlState.XFREND, 0.25)
         return data_in
 
     def info_transfer_in(self, octet_mode=OctetMode.SOM):
         self.bus_control(BusCtlTyp.OP_CMD, BusCtlDir.INFO_IN)
+
         data = b""
         while True:
             recv = self.transfer_in(octet_mode)
@@ -450,21 +423,20 @@ class IpiL1:
             'parity_error': bool(resp & 0x40),
             'params': resp & 0x3F
         }
+
         return data, slavack
 
     def info_transfer_out(self, data, octet_mode=OctetMode.SOM):
         assert octet_mode == OctetMode.SOM, 'DOM not implemented yet'
+
         self.bus_control(BusCtlTyp.OP_CMD, BusCtlDir.INFO_OUT)
+
         for data_byte in data:
             self.transfer_out((data_byte,), octet_mode)
 
-        self.phy_state.sync_out = False
-        self.phy.set_state(self.phy_state)
+        self.apply_state(PhyCtrlState.XFRRDY)
         self.wait_for_state(PhyCtrlState.SLAVEND, 0.5)
-        self.phy_state.busa = IpiDataBus(True, 0x80)
-        self.phy.set_state(self.phy_state)
-        self.phy_state.mst_out = False
-        self.phy.set_state(self.phy_state)
+        self.apply_state(PhyCtrlState.SELECT, IpiDataBus(True, 0x80))
         self.wait_for_state(PhyCtrlState.SLAVACK, 0.5)
         resp = self.phy_state.busb.value
         slavack = {

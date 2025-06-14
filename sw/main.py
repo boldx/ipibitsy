@@ -12,7 +12,6 @@ ser = Serial("/dev/ttyACM0")
 phy = IpiPhy(ser)
 ipi = IpiL1(phy)
 
-ipi.apply_state(PhyCtrlState.IDLE, IpiDataBus(True, 0))
 print('Transfer settings:', ipi.request_transfer_settings(2))
 print("Select:", ipi.select(2))
 print("Tranfer in")
@@ -23,8 +22,8 @@ while True:
         break
 
 stat = defaultdict(list)
-print("Transfer out")
 for x in range(1):
+    print("Transfer out")
     #cmd = b"\x00\x09\x00\x01\x41\x00\x02" + bytes([i]) + b"\x02\x51\x20"
     # cmd = b"\x00\x06\x00\x01\x42\x00\x02\xff"
     #cmd = b"\x00\x06\x00\x01\x02\x00\x02" + bytes([i])
