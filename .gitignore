@@ -1,6 +1,10 @@
 hw/plots
 hw/ipibitsy-backups
-fw/**/*.d
-fw/**/*.o
-fw/**/*.elf
-fw/**/*.bin
+**/*.d
+**/*.o
+**/*.elf
+**/*.bin
+sw/sandbox
+**/__pycache__
+**/venv
+**/.idea
