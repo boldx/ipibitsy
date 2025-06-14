@@ -1,2 +1,6 @@
 hw/plots
 hw/ipibitsy-backups
+fw/**/*.d
+fw/**/*.o
+fw/**/*.elf
+fw/**/*.bin
